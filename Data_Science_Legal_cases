@@ -1,0 +1,83 @@
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+import time
+import os
+
+print("<<<< 대한민국 종합법률정보 판례 검색 결과 저장 시스템 VERSION 0.1_20210509 BY Heechan Jeong hcjeong@anguklaw.com >>>>")
+print()
+kwd = input("검색어 <예:  '한다'>: ")
+print()
+break_page = int(input("위 검색어로 조금이라도 작업한 마지막 페이지를 정수로 입력 후 엔터(처음 작업이면 '1' 입력): ")) - 1
+print("작업을 시작할 페이지: ", break_page+1)
+print()
+print("작업을 시작합니다...")
+print()
+
+while True:
+    URL = 'https://glaw.scourt.go.kr/wsjo/panre/sjo050.do'
+    driver = webdriver.Chrome('c:\\chromedriver.exe')
+    offset = break_page
+    try:
+        driver.get(URL)
+        time.sleep(1)
+        print(driver.current_url)
+
+        search = driver.find_element_by_name("srchw")
+        search.send_keys(kwd) #가장 많은 검색 결과를 주는 검색어로 보입니다
+        search.send_keys(Keys.RETURN)
+        time.sleep(2)
+
+        list_location = driver.find_elements_by_class_name('list_location')
+        pg = int(list_location[-1].text.split('/')[1]) #검색 결과가 총 몇 페이지인지를 정수형으로 저장합니다
+        print("앞으로 작업할 페이지 수는 : ", pg-offset)
+        print()
+        print("starting page: ", offset+1)
+        for j in range(pg-offset):
+
+            # 페이지 이동
+            search = driver.find_element_by_name("pagingPageNo")
+            search.clear()
+            search.send_keys(str(j+offset+1))
+            search.send_keys(Keys.RETURN)
+            break_page = j + offset
+            time.sleep(2)
+
+            # 페이지 내 판례 리스트 확보
+            listConts = WebDriverWait(driver, 10).until(
+                EC.presence_of_all_elements_located((By.NAME,"listCont"))
+                ) # 페이지의 판례 목록에 있는 판례들을 리스트 자료형으로 담습니다
+            YOUR_DIRECTORY_NAME = "c://case_"+kwd+"/" + str(j+offset+1) +"_page/"
+            print(YOUR_DIRECTORY_NAME)
+            if not (os.path.isdir(YOUR_DIRECTORY_NAME)):
+                os.makedirs(os.path.join(YOUR_DIRECTORY_NAME))
+            for i in range(len(listConts)):
+                filepath = os.path.join(YOUR_DIRECTORY_NAME, "case_"+str(j+offset+1)+"_"+str(i)+".txt")
+                with open(filepath, "w", encoding='utf-8') as file:
+                    file.write(listConts[i].find_element_by_tag_name('strong').find_element_by_tag_name('strong').text)
+                    listConts[i].click()
+                    time.sleep(3)
+                    driver.switch_to.window(driver.window_handles[1])
+                    case = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.CLASS_NAME, "page"))
+                    )
+                    file.write(case.text)
+                    network = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.ID, "areaNetwork"))
+                    )
+                    file.write(network.text)
+                driver.close()
+                driver.switch_to.window(driver.window_handles[0])
+        break
+    except Exception as inst:
+        print(type(inst))  # the exception instance
+        print(inst.args)  # arguments stored in .args
+        print(inst)
+    finally:
+        time.sleep(10)
+        driver.quit()
+        time.sleep(10)
+
+print("전체 페이지 저장 완료")
